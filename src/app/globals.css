@@ -1,0 +1,221 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-script), "Snell Roundhand", cursive;
+  --font-mono: var(--font-geist-mono);
+  --color-gold: #141414;
+  --color-cream: #f6efe6;
+  --color-pink: #e4c8c4;
+  --color-sky: #e2e8e4;
+  --color-ink: #141414;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: #f6efe6;
+  --foreground: #141414;
+  --card: #fbf7f0;
+  --card-foreground: #141414;
+  --popover: #fbf7f0;
+  --popover-foreground: #141414;
+  --primary: #141414;
+  --primary-foreground: #fbf7f0;
+  --secondary: #e2e8e4;
+  --secondary-foreground: #141414;
+  --muted: #eadcd4;
+  --muted-foreground: #5c534c;
+  --accent: #e8d4d0;
+  --accent-foreground: #141414;
+  --destructive: #c23b4a;
+  --border: rgb(20 20 20 / 16%);
+  --input: rgb(20 20 20 / 18%);
+  --ring: #141414;
+  --chart-1: #141414;
+  --chart-2: #c9a8a2;
+  --chart-3: #9aaeb0;
+  --chart-4: #f6efe6;
+  --chart-5: #5c534c;
+  --radius: 1.15rem;
+  --sidebar: #fbf7f0;
+  --sidebar-foreground: #141414;
+  --sidebar-primary: #141414;
+  --sidebar-primary-foreground: #fbf7f0;
+  --sidebar-accent: #e8d4d0;
+  --sidebar-accent-foreground: #141414;
+  --sidebar-border: rgb(20 20 20 / 16%);
+  --sidebar-ring: #141414;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+  html {
+    @apply font-sans;
+  }
+  button,
+  a {
+    cursor: pointer;
+  }
+}
+
+@utility font-heading {
+  font-family: var(--font-heading), "Snell Roundhand", cursive;
+  font-weight: 400;
+}
+
+@utility eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-ink);
+}
+
+@utility pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #141414;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+@utility surface {
+  background: #fbf7f0;
+  box-shadow: 0 10px 30px rgb(80 55 35 / 6%);
+}
+
+@utility btn-gold {
+  display: flex;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #141414;
+  color: #fbf7f0;
+  font-size: 0.95rem;
+  font-weight: 550;
+  letter-spacing: 0.04em;
+  transition: transform 160ms ease, filter 160ms ease;
+  &:active {
+    transform: scale(0.98);
+    filter: brightness(0.94);
+  }
+}
+
+@utility press {
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  &:active {
+    transform: scale(0.985);
+  }
+}
+
+.hours-drop > summary {
+  display: flex;
+  list-style: none;
+}
+
+.hours-drop > summary::-webkit-details-marker,
+.hours-drop > summary::marker {
+  display: none;
+  content: none;
+}
+
+.hours-drop[open] [data-hours-chevron] {
+  transform: rotate(180deg);
+  background: #e8d4d0;
+}
+
+.status-dot {
+  position: relative;
+}
+
+.status-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  background: inherit;
+  opacity: 0.35;
+  animation: status-pulse 2.2s ease-out infinite;
+}
+
+@keyframes status-pulse {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.45;
+  }
+  70% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-gold,
+  .press,
+  .status-dot::after,
+  .hours-drop [data-hours-chevron] {
+    animation: none;
+    transition: none;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
