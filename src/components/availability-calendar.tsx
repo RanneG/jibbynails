@@ -13,6 +13,7 @@ import {
   pastBookingCutoff,
   shiftMonth,
   todayKey,
+  type DayOverride,
   type OccupiedSlot,
 } from "@/lib/slots";
 import { cn } from "@/lib/utils";
@@ -23,10 +24,12 @@ const MAX_MONTHS_AHEAD = 6;
 export function AvailabilityCalendar({
   book,
   occupied,
+  overrides = [],
   taken,
 }: {
   book: BookState;
   occupied: OccupiedSlot[];
+  overrides?: DayOverride[];
   taken?: boolean;
 }) {
   const todayMonth = todayKey().slice(0, 7);
@@ -41,14 +44,14 @@ export function AvailabilityCalendar({
   const minutes = (book.hours || 1) * 60;
   const [year, monthNum] = view.split("-").map(Number);
   const days = useMemo(
-    () => generateMonth(year, monthNum, minutes, occupied),
-    [year, monthNum, minutes, occupied]
+    () => generateMonth(year, monthNum, minutes, occupied, overrides),
+    [year, monthNum, minutes, occupied, overrides]
   );
   const byDate = useMemo(() => new Map(days.map((day) => [day.date, day])), [days]);
   const weeks = monthMatrix(year, monthNum);
   const selected = book.date ? byDate.get(book.date) : undefined;
   const selectedEmpty = Boolean(book.date && (!selected || selected.times.length === 0));
-  const upcoming = nextAvailable(minutes, occupied, selectedEmpty ? book.date : undefined);
+  const upcoming = nextAvailable(minutes, occupied, selectedEmpty ? book.date : undefined, overrides);
 
   const prev = shiftMonth(view, -1);
   const next = shiftMonth(view, 1);

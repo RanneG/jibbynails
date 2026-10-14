@@ -2,7 +2,28 @@ import { promises as fs } from "fs";
 import path from "path";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { chairBufferMinutes } from "./hours";
-import { slotConflicts, type OccupiedSlot } from "./slots";
+import { holdMinutes, holdsAsOccupied, slotConflicts, type DayOverride, type OccupiedSlot, type TimeHold } from "./slots";
+
+export type { DayOverride, TimeHold } from "./slots";
+
+export type StudioEmployee = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
+export type Shift = {
+  date: string;
+  employeeId: string;
+};
+
+export const DEFAULT_EMPLOYEE_ID = "emp_jibby";
+
+export const DEFAULT_EMPLOYEE: StudioEmployee = {
+  id: DEFAULT_EMPLOYEE_ID,
+  name: "Jibby",
+  createdAt: "2024-01-01T00:00:00.000Z",
+};
 
 const FILE = path.join(process.cwd(), "data", "store.json");
 const SECRET = process.env.SESSION_SECRET || "jibby-local-dev-secret";
@@ -22,9 +43,24 @@ export type StudioBooking = {
   inspo: string;
   nailPhotoUrl?: string;
   status?: BookingStatus;
+  /** Message the client sees on their booking. */
   updateNote?: string;
   extraBufferMinutes?: number;
   updatedAt?: string;
+  /** When Jibby first opened this booking in the manager. Unset means it is new to her. */
+  ownerSeenAt?: string;
+  depositPaid?: boolean;
+  /** What she actually charged on the day, in pounds. */
+  chargedOnDay?: number;
+  /** Only Jibby sees this. */
+  ownerNote?: string;
+};
+
+export type ClientNote = {
+  /** Lower-cased email. */
+  key: string;
+  note: string;
+  updatedAt: string;
 };
 
 export type AccountUser = {
@@ -60,9 +96,24 @@ type Store = {
   sessions: Session[];
   bookings: StudioBooking[];
   reviews: StoredReview[];
+  overrides: DayOverride[];
+  clientNotes: ClientNote[];
+  holds: TimeHold[];
+  employees: StudioEmployee[];
+  shifts: Shift[];
 };
 
-const empty: Store = { users: [], sessions: [], bookings: [], reviews: [] };
+const empty: Store = {
+  users: [],
+  sessions: [],
+  bookings: [],
+  reviews: [],
+  overrides: [],
+  clientNotes: [],
+  holds: [],
+  employees: [],
+  shifts: [],
+};
 
 let queue: Promise<unknown> = Promise.resolve();
 
@@ -84,6 +135,11 @@ async function readStore(): Promise<Store> {
       sessions: parsed.sessions ?? [],
       bookings: parsed.bookings ?? [],
       reviews: parsed.reviews ?? [],
+      overrides: parsed.overrides ?? [],
+      clientNotes: parsed.clientNotes ?? [],
+      holds: parsed.holds ?? [],
+      employees: parsed.employees ?? [],
+      shifts: parsed.shifts ?? [],
     };
   } catch {
     return { ...empty };
@@ -134,12 +190,25 @@ export function toOccupied(bookings: StudioBooking[], exceptId?: string): Occupi
     .map((item) => ({ date: item.date, time: item.time, hours: blockedHours(item) }));
 }
 
+/** Chair time already taken: visits, their buffers, and any booked-out breaks. */
+export function chairOccupied(bookings: StudioBooking[], holds: TimeHold[] = [], exceptId?: string): OccupiedSlot[] {
+  return [...toOccupied(bookings, exceptId), ...holdsAsOccupied(holds)];
+}
+
+function employeesOf(store: Store): StudioEmployee[] {
+  return store.employees.length > 0 ? store.employees : [{ ...DEFAULT_EMPLOYEE }];
+}
+
+function ensureTeam(store: Store) {
+  if (store.employees.length === 0) store.employees = [{ ...DEFAULT_EMPLOYEE }];
+}
+
 export async function createBooking(
   input: Omit<StudioBooking, "id" | "createdAt" | "status" | "updatedAt" | "extraBufferMinutes" | "updateNote">
 ) {
   return run(async () => {
     const store = await readStore();
-    if (slotConflicts(input.date, input.time, input.hours, toOccupied(store.bookings))) {
+    if (slotConflicts(input.date, input.time, input.hours, chairOccupied(store.bookings, store.holds))) {
       return { ok: false as const, reason: "taken" };
     }
     const booking: StudioBooking = {
@@ -169,7 +238,7 @@ export async function updateBooking(
         current.date,
         current.time,
         current.hours,
-        toOccupied(store.bookings, id),
+        chairOccupied(store.bookings, store.holds, id),
         chairBufferMinutes + extra
       )
     ) {
@@ -210,6 +279,183 @@ export async function cancelBooking(id: string, note: string) {
     );
     await writeStore(store);
     return { ok: true as const };
+  });
+}
+
+/* ---------- Owner-only: what Jibby tracks that the client never sees ---------- */
+
+export async function markBookingSeen(id: string) {
+  return run(async () => {
+    const store = await readStore();
+    const current = store.bookings.find((item) => item.id === id);
+    if (!current || current.ownerSeenAt) return;
+    current.ownerSeenAt = new Date().toISOString();
+    await writeStore(store);
+  });
+}
+
+export async function markAllBookingsSeen() {
+  return run(async () => {
+    const store = await readStore();
+    const now = new Date().toISOString();
+    store.bookings = store.bookings.map((item) => (item.ownerSeenAt ? item : { ...item, ownerSeenAt: now }));
+    await writeStore(store);
+  });
+}
+
+export async function setBookingPrivate(
+  id: string,
+  input: { depositPaid: boolean; chargedOnDay?: number; ownerNote: string }
+) {
+  return run(async () => {
+    const store = await readStore();
+    const current = store.bookings.find((item) => item.id === id);
+    if (!current) return { ok: false as const, reason: "missing" };
+    const note = input.ownerNote.trim();
+    store.bookings = store.bookings.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            depositPaid: input.depositPaid,
+            chargedOnDay: input.chargedOnDay,
+            ownerNote: note || undefined,
+          }
+        : item
+    );
+    await writeStore(store);
+    return { ok: true as const };
+  });
+}
+
+export async function listOverrides() {
+  return run(async () => (await readStore()).overrides);
+}
+
+export async function setOverride(override: DayOverride) {
+  return run(async () => {
+    const store = await readStore();
+    store.overrides = [...store.overrides.filter((item) => item.date !== override.date), override].sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+    await writeStore(store);
+  });
+}
+
+export async function removeOverride(date: string) {
+  return run(async () => {
+    const store = await readStore();
+    store.overrides = store.overrides.filter((item) => item.date !== date);
+    await writeStore(store);
+  });
+}
+
+export async function listHolds() {
+  return run(async () => (await readStore()).holds);
+}
+
+export async function addHold(input: { date: string; start: string; end: string; note?: string }) {
+  return run(async () => {
+    const store = await readStore();
+    const minutes = holdMinutes(input);
+    if (minutes < 30) return { ok: false as const, reason: "hold" };
+    if (slotConflicts(input.date, input.start, minutes / 60, chairOccupied(store.bookings, store.holds), 0)) {
+      return { ok: false as const, reason: "overlap" };
+    }
+    const hold: TimeHold = {
+      id: newId("hold"),
+      date: input.date,
+      start: input.start,
+      end: input.end,
+      note: input.note,
+    };
+    store.holds = [...store.holds, hold].sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`));
+    await writeStore(store);
+    return { ok: true as const, hold };
+  });
+}
+
+export async function removeHold(id: string) {
+  return run(async () => {
+    const store = await readStore();
+    const before = store.holds.length;
+    store.holds = store.holds.filter((item) => item.id !== id);
+    if (store.holds.length === before) return { ok: false as const, reason: "missing" };
+    await writeStore(store);
+    return { ok: true as const };
+  });
+}
+
+export async function listEmployees() {
+  return run(async () => employeesOf(await readStore()));
+}
+
+export async function addEmployee(name: string) {
+  return run(async () => {
+    const store = await readStore();
+    const trimmed = name.replace(/\s+/g, " ").trim();
+    if (trimmed.length < 2 || trimmed.length > 40) return { ok: false as const, reason: "name" };
+    ensureTeam(store);
+    if (store.employees.some((item) => item.name.toLowerCase() === trimmed.toLowerCase())) {
+      return { ok: false as const, reason: "exists" };
+    }
+    const employee: StudioEmployee = { id: newId("emp"), name: trimmed, createdAt: new Date().toISOString() };
+    store.employees.push(employee);
+    await writeStore(store);
+    return { ok: true as const, employee };
+  });
+}
+
+export async function removeEmployee(id: string) {
+  return run(async () => {
+    const store = await readStore();
+    ensureTeam(store);
+    if (id === DEFAULT_EMPLOYEE_ID) return { ok: false as const, reason: "default" };
+    if (!store.employees.some((item) => item.id === id)) return { ok: false as const, reason: "missing" };
+    store.employees = store.employees.filter((item) => item.id !== id);
+    store.shifts = store.shifts.map((item) => (item.employeeId === id ? { ...item, employeeId: DEFAULT_EMPLOYEE_ID } : item));
+    await writeStore(store);
+    return { ok: true as const };
+  });
+}
+
+export async function listShifts() {
+  return run(async () => (await readStore()).shifts);
+}
+
+export async function setShift(shift: Shift) {
+  return run(async () => {
+    const store = await readStore();
+    ensureTeam(store);
+    if (!store.employees.some((item) => item.id === shift.employeeId)) {
+      return { ok: false as const, reason: "missing" };
+    }
+    store.shifts = [...store.shifts.filter((item) => item.date !== shift.date), shift].sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+    await writeStore(store);
+    return { ok: true as const };
+  });
+}
+
+export async function removeShift(date: string) {
+  return run(async () => {
+    const store = await readStore();
+    store.shifts = store.shifts.filter((item) => item.date !== date);
+    await writeStore(store);
+  });
+}
+
+export async function listClientNotes() {
+  return run(async () => (await readStore()).clientNotes);
+}
+
+export async function setClientNote(key: string, note: string) {
+  return run(async () => {
+    const store = await readStore();
+    const trimmed = note.trim();
+    const rest = store.clientNotes.filter((item) => item.key !== key);
+    store.clientNotes = trimmed ? [...rest, { key, note: trimmed, updatedAt: new Date().toISOString() }] : rest;
+    await writeStore(store);
   });
 }
 

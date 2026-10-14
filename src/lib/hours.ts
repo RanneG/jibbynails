@@ -2,7 +2,7 @@ import { studio } from "./studio";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-function londonNow() {
+export function londonNow() {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/London",
     weekday: "short",

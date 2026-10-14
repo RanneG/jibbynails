@@ -215,6 +215,16 @@
   }
 }
 
+.buffer-hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 5px,
+    rgb(20 20 20 / 7%) 5px,
+    rgb(20 20 20 / 7%) 9px
+  );
+}
+
 ::-webkit-scrollbar {
   width: 0;
   height: 0;

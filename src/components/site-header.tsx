@@ -17,6 +17,8 @@ const links = [
 
 export function SiteHeader() {
   const pathname = usePathname();
+  // The manager has its own chrome; the public nav would only get in her way.
+  if (pathname.startsWith("/owner")) return null;
 
   return (
     <header className="sticky top-0 z-40 hidden border-b border-ink/10 bg-background/90 backdrop-blur-xl md:block">

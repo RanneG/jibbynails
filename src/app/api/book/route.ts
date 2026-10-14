@@ -9,9 +9,11 @@ import {
   createSession,
   createUser,
   findUserByEmail,
+  chairOccupied,
   listBookings,
+  listHolds,
+  listOverrides,
   newId,
-  toOccupied,
   verifyPassword,
 } from "@/lib/server-store";
 import { daySlots, pastBookingCutoff, slotConflicts } from "@/lib/slots";
@@ -74,8 +76,9 @@ export async function POST(request: Request) {
     return redirectTo(request, `/book?${params.toString()}`);
   }
 
-  const occupied = toOccupied(await listBookings());
-  const open = daySlots(date, hours * 60, occupied);
+  const [bookings, overrides, holds] = await Promise.all([listBookings(), listOverrides(), listHolds()]);
+  const occupied = chairOccupied(bookings, holds);
+  const open = daySlots(date, hours * 60, occupied, overrides);
   if (slotConflicts(date, time, hours, occupied) || !open.times.includes(time)) {
     const params = new URLSearchParams({ s: "when", h: String(hours), day: date, taken: "1" });
     return redirectTo(request, `/book?${params.toString()}`);

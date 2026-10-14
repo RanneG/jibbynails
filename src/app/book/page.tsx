@@ -1,6 +1,6 @@
 import { BookingWizard } from "./booking-wizard";
 import { bookFromParams } from "@/lib/booking-url";
-import { listBookings, toOccupied } from "@/lib/server-store";
+import { chairOccupied, listBookings, listHolds, listOverrides } from "@/lib/server-store";
 import { currentUser } from "@/lib/session";
 
 export const metadata = {
@@ -31,14 +31,20 @@ export default async function BookPage({
     const item = first(value);
     if (item) qs.set(key, item);
   }
-  const [bookings, user] = await Promise.all([listBookings(), currentUser()]);
-  const occupied = toOccupied(bookings);
+  const [bookings, overrides, holds, user] = await Promise.all([
+    listBookings(),
+    listOverrides(),
+    listHolds(),
+    currentUser(),
+  ]);
+  const occupied = chairOccupied(bookings, holds);
   return (
     <BookingWizard
       book={bookFromParams(qs)}
       taken={first(raw.taken) === "1"}
       formError={detailsError(first(raw.err))}
       occupied={occupied}
+      overrides={overrides}
       account={user ? { name: user.name, email: user.email, phone: user.phone } : null}
     />
   );

@@ -15,6 +15,52 @@ export type OccupiedSlot = {
   hours: number;
 };
 
+/** One-off change to a day: closed, or different opening hours. Set by the owner. */
+export type DayOverride = {
+  date: string;
+  closed: boolean;
+  openHour?: number;
+  closeHour?: number;
+  note?: string;
+};
+
+/** A stretch of an open day that nobody can book — lunch, admin, a break. */
+export type TimeHold = {
+  id: string;
+  date: string;
+  start: string;
+  end: string;
+  note?: string;
+};
+
+export type DayHours = {
+  closed: boolean;
+  openHour: number;
+  closeHour: number;
+  override?: DayOverride;
+};
+
+/** Opening hours for a date, with any owner override applied over the usual week. */
+export function dayHours(date: string, overrides: DayOverride[] = []): DayHours {
+  const override = overrides.find((item) => item.date === date);
+  if (override) {
+    if (override.closed) {
+      return { closed: true, openHour: studio.openHour, closeHour: studio.closeHour, override };
+    }
+    return {
+      closed: false,
+      openHour: override.openHour ?? studio.openHour,
+      closeHour: override.closeHour ?? studio.closeHour,
+      override,
+    };
+  }
+  return {
+    closed: !studio.openDays.includes(weekdayIndex(date)),
+    openHour: studio.openHour,
+    closeHour: studio.closeHour,
+  };
+}
+
 function londonParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/London",
@@ -80,6 +126,30 @@ export function timeToMinutes(hhmm: string) {
   return hour * 60 + minute;
 }
 
+export function holdMinutes(hold: Pick<TimeHold, "start" | "end">) {
+  return timeToMinutes(hold.end) - timeToMinutes(hold.start);
+}
+
+export function holdsAsOccupied(holds: TimeHold[]): OccupiedSlot[] {
+  return holds
+    .filter((item) => holdMinutes(item) > 0)
+    .map((item) => ({ date: item.date, time: item.start, hours: holdMinutes(item) / 60 }));
+}
+
+export function clockStamps(fromHour = 6, toHour = 22) {
+  const stamps: string[] = [];
+  for (let t = fromHour * 60; t <= toHour * 60; t += 30) {
+    stamps.push(`${pad(Math.floor(t / 60))}:${pad(t % 60)}`);
+  }
+  return stamps;
+}
+
+export function isClockStamp(value: string) {
+  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+  const minutes = timeToMinutes(value);
+  return minutes % 30 === 0 && minutes >= 6 * 60 && minutes <= 22 * 60;
+}
+
 /** True once it is 12:00 noon London time on the day before `date`, or later. */
 export function pastBookingCutoff(date: string) {
   const cutoffDay = addDays(date, -1);
@@ -116,19 +186,18 @@ export function slotConflicts(
   });
 }
 
-function timesForDate(date: string, minutes: number, occupied: OccupiedSlot[]) {
+function timesForDate(date: string, minutes: number, occupied: OccupiedSlot[], day: DayHours) {
   const duration = Math.max(minutes || 60, 30);
-  const dow = weekdayIndex(date);
-  if (!studio.openDays.includes(dow)) return [];
+  if (day.closed) return [];
 
   const now = londonParts(new Date());
   const today = todayKey();
   if (date < today || pastBookingCutoff(date)) return [];
   const hours = duration / 60;
-  const lastStart = studio.closeHour * 60 - duration;
+  const lastStart = day.closeHour * 60 - duration;
   const times: string[] = [];
 
-  for (let t = studio.openHour * 60; t <= lastStart; t += 30) {
+  for (let t = day.openHour * 60; t <= lastStart; t += 30) {
     const hour = Math.floor(t / 60);
     const minute = t % 60;
     if (date === today && (hour < now.hour || (hour === now.hour && minute <= now.minute))) {
@@ -142,32 +211,43 @@ function timesForDate(date: string, minutes: number, occupied: OccupiedSlot[]) {
   return times;
 }
 
-export function daySlots(date: string, minutes: number, occupied: OccupiedSlot[] = []): DaySlots {
-  const closed = !studio.openDays.includes(weekdayIndex(date));
+export function daySlots(
+  date: string,
+  minutes: number,
+  occupied: OccupiedSlot[] = [],
+  overrides: DayOverride[] = []
+): DaySlots {
+  const day = dayHours(date, overrides);
   return {
     date,
     label: prettyDate(date),
     weekday: weekdayName(date),
-    closed,
-    times: closed ? [] : timesForDate(date, minutes, occupied),
+    closed: day.closed,
+    times: day.closed ? [] : timesForDate(date, minutes, occupied, day),
   };
 }
 
-export function generateDays(minutes: number, count = 16, occupied: OccupiedSlot[] = []): DaySlots[] {
+export function generateDays(
+  minutes: number,
+  count = 16,
+  occupied: OccupiedSlot[] = [],
+  overrides: DayOverride[] = []
+): DaySlots[] {
   const start = todayKey();
-  return Array.from({ length: count }, (_, i) => daySlots(addDays(start, i), minutes, occupied));
+  return Array.from({ length: count }, (_, i) => daySlots(addDays(start, i), minutes, occupied, overrides));
 }
 
 export function generateMonth(
   year: number,
   month: number,
   minutes: number,
-  occupied: OccupiedSlot[] = []
+  occupied: OccupiedSlot[] = [],
+  overrides: DayOverride[] = []
 ) {
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   return Array.from({ length: daysInMonth }, (_, i) => {
     const date = `${year}-${pad(month)}-${pad(i + 1)}`;
-    return daySlots(date, minutes, occupied);
+    return daySlots(date, minutes, occupied, overrides);
   });
 }
 
@@ -185,11 +265,16 @@ export function monthMatrix(year: number, month: number) {
   return weeks;
 }
 
-export function nextAvailable(minutes: number, occupied: OccupiedSlot[] = [], after?: string) {
+export function nextAvailable(
+  minutes: number,
+  occupied: OccupiedSlot[] = [],
+  after?: string,
+  overrides: DayOverride[] = []
+) {
   const start = after && after > todayKey() ? after : todayKey();
   for (let i = 0; i < 90; i += 1) {
     const date = addDays(start, i);
-    const day = daySlots(date, minutes, occupied);
+    const day = daySlots(date, minutes, occupied, overrides);
     if (!day.closed && day.times.length > 0) return day;
   }
   return null;

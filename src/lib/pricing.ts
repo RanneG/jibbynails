@@ -1,4 +1,5 @@
-import type { Draft, Family, Length, Quote, WizardStep } from "./types";
+import { consultLengths, consultRate } from "./hours";
+import type { Design, Draft, Family, Intent, Length, Quote, WizardStep } from "./types";
 
 const base: Record<
   Family,
@@ -268,3 +269,69 @@ export function defaultSoak(draft: Draft) {
 export function serviceLabel(draft: Draft) {
   return quoteDraft(draft).summary;
 }
+
+const lengthLabels: Record<Length, string> = {
+  overlay: "Overlay",
+  miniMedium: "Mini–medium",
+  longXl: "Long–XL",
+  xxl: "XXL+",
+};
+
+export function catalogLengths(family: Family): { id: Length; label: string; amount: number }[] {
+  const keys: Length[] =
+    family === "gelx"
+      ? ["miniMedium", "longXl", "xxl"]
+      : family === "biab"
+        ? ["overlay", "miniMedium"]
+        : ["overlay", "miniMedium", "longXl", "xxl"];
+  return keys.flatMap((id) => {
+    const row = base[family][id];
+    return row ? [{ id, label: lengthLabels[id], amount: row.amount }] : [];
+  });
+}
+
+export function catalogDesigns(): { id: Design; label: string; amount: number }[] {
+  return (Object.keys(designPrices) as Design[]).map((id) => ({
+    id,
+    label: designPrices[id].label,
+    amount: designPrices[id].amount,
+  }));
+}
+
+/** Smallest chair slot that fits the work. */
+export function slotForMinutes(minutes: number) {
+  if (!minutes) return null;
+  return consultLengths.find((item) => item.hours * 60 >= minutes) ?? consultLengths[consultLengths.length - 1];
+}
+
+export function quoteInvoice(quote: Quote) {
+  const slot = slotForMinutes(quote.minutes);
+  const deposit = slot ? slot.hours * consultRate : 0;
+  return {
+    slot,
+    deposit,
+    balance: Math.max(0, quote.total - deposit),
+  };
+}
+
+export const intents: { id: Intent; label: string }[] = [
+  { id: "new", label: "New set" },
+  { id: "infill", label: "Infill" },
+  { id: "recreate", label: "Recreate" },
+  { id: "removal", label: "Soak off only" },
+  { id: "repair", label: "Repair" },
+];
+
+export const nailStates: { id: NonNullable<Draft["onNails"]>; label: string }[] = [
+  { id: "bare", label: "Bare nails" },
+  { id: "jibby", label: "Jibby’s set" },
+  { id: "foreign", label: "Another tech" },
+  { id: "gel", label: "Old gel" },
+];
+
+export const families: { id: Family; label: string }[] = [
+  { id: "acrylic", label: "Acrylic" },
+  { id: "gelx", label: "Gel-X" },
+  { id: "biab", label: "BIAB" },
+  { id: "gelmani", label: "Gel manicure" },
+];

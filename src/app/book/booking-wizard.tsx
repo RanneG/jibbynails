@@ -14,7 +14,7 @@ import {
   typicalHoursLabel,
 } from "@/lib/hours";
 import { formatDuration, formatMoney } from "@/lib/pricing";
-import type { OccupiedSlot } from "@/lib/slots";
+import type { DayOverride, OccupiedSlot } from "@/lib/slots";
 import { cn } from "@/lib/utils";
 
 const steps = ["tier", "when", "details"] as const;
@@ -22,12 +22,14 @@ const steps = ["tier", "when", "details"] as const;
 export function BookingWizard({
   book,
   occupied,
+  overrides = [],
   account,
   taken,
   formError,
 }: {
   book: BookState;
   occupied: OccupiedSlot[];
+  overrides?: DayOverride[];
   account?: { name: string; email: string; phone: string } | null;
   taken?: boolean;
   formError?: string;
@@ -122,7 +124,12 @@ export function BookingWizard({
                 <HoursCard />
               </div>
               <div className="mt-5">
-                <AvailabilityCalendar book={{ ...book, hours: tier.hours }} occupied={occupied} taken={taken} />
+                <AvailabilityCalendar
+                  book={{ ...book, hours: tier.hours }}
+                  occupied={occupied}
+                  overrides={overrides}
+                  taken={taken}
+                />
               </div>
             </>
           )}
