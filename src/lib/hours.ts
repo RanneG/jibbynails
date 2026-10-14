@@ -122,11 +122,81 @@ export function openingStatus() {
 }
 
 export const consultRate = 15;
+/** Kept free after every booking so she can message the client. */
+export const chairBufferMinutes = 30;
+export const extraBufferChoices = [0, 15, 30, 45] as const;
 
+/**
+ * Bookable chair times.
+ * `price` is the deposit (`hours * consultRate`).
+ * `setRange` is the set on the day, low to high for what that tier usually includes.
+ */
 export const consultLengths = [
-  { hours: 1, label: "1 hour", price: 15 },
-  { hours: 1.5, label: "1½ hours", price: 22.5 },
-  { hours: 2, label: "2 hours", price: 30 },
-  { hours: 2.5, label: "2½ hours", price: 37.5 },
-  { hours: 3, label: "3 hours", price: 45 },
+  {
+    hours: 1,
+    tier: "Tier 0",
+    name: "Solid or Colour",
+    label: "1 hour",
+    price: 15,
+    setRange: "£27–£32",
+    detail: "One solid colour or a simple colour. No art, and not a soak off with a new set.",
+    includes: ["One colour from her rack", "Overlay, infill, or a plain full set", "No art, no soak off with a new set"],
+  },
+  {
+    hours: 1.5,
+    tier: "Tier 1",
+    name: "Cute & Simple set",
+    label: "1½ hours",
+    price: 22.5,
+    setRange: "£35–£50",
+    detail: "French, a little art, or a straightforward shape.",
+    includes: ["French, ombré, or a tip line", "A little art on a few nails", "Small charms or a simple shape change"],
+  },
+  {
+    hours: 2,
+    tier: "Tier 2",
+    name: "Sweet & Spicy set",
+    label: "2 hours",
+    price: 30,
+    setRange: "£35–£75",
+    detail: "More art, charms, or a soak off with a new set.",
+    includes: ["Art on most nails, charms, pearls", "Longer sets with a design", "Soak off with a new set"],
+  },
+  {
+    hours: 3,
+    tier: "Tier 3",
+    name: "Masterpiece set",
+    label: "3 hours",
+    price: 45,
+    setRange: "£50–£90",
+    detail: "Intricate art, a recreate, or XXL that needs the whole chair.",
+    includes: ["3D bows, characters, and textures", "Hand-painted art across the set", "Recreates and XXL"],
+  },
 ] as const;
+
+export type ConsultLength = (typeof consultLengths)[number];
+
+export function consultByHours(hours: number) {
+  return consultLengths.find((item) => item.hours === hours);
+}
+
+export function durationLabel(hours: number) {
+  const tier = consultByHours(hours);
+  if (tier) return tier.label;
+  if (hours === 1) return "1 hour";
+  return `${hours} hours`;
+}
+
+export function tierTitle(hours: number) {
+  const tier = consultByHours(hours);
+  if (!tier) return durationLabel(hours);
+  return `${tier.tier} · ${tier.name} · ${tier.label}`;
+}
+
+export function timePlus(hhmm: string, minutes: number) {
+  const [hourPart, minutePart] = hhmm.split(":");
+  const total = Number(hourPart) * 60 + Number(minutePart || 0) + minutes;
+  const hour = Math.floor(total / 60) % 24;
+  const minute = ((total % 60) + 60) % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}

@@ -15,7 +15,16 @@
 # local booking store
 /data/*.json
 
+# uploaded review photos
+/public/reviews/*
+!/public/reviews/.gitkeep
+
+# nail photos sent with bookings
+/public/nails/*
+!/public/nails/.gitkeep
+
 # misc
 .DS_Store
 *.pem
 npm-debug.log*
+*.tsbuildinfo

@@ -4,8 +4,11 @@ import { BottomNav } from "@/components/bottom-nav";
 import { HomeReviews } from "@/components/home-reviews";
 import { HoursCard } from "@/components/hours-card";
 import { SocialLinks } from "@/components/social-links";
+import { TierCards } from "@/components/tier-cards";
 import { featured } from "@/lib/menu";
 import { studio } from "@/lib/studio";
+
+export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   return (
@@ -30,18 +33,15 @@ export default function HomePage() {
             <h1 className="font-heading mt-2 text-[3.4rem] leading-none md:text-[5rem] lg:text-[6rem]">
               Jibbynails
             </h1>
-            <p className="mx-auto mt-3 max-w-[16rem] text-center text-sm tracking-wide text-muted-foreground md:mx-0 md:max-w-md md:text-left md:text-base">
-              kawaii, 3d and character sets. £15 deposit an hour.
-            </p>
             <div className="mt-8 hidden gap-3 md:flex md:max-w-md">
               <Link href="/book" className="btn-gold flex-1">
                 Book
               </Link>
               <Link
-                href="/menu"
+                href="/sets"
                 className="press flex h-12 flex-1 items-center justify-center rounded-full border-[1.5px] border-ink lg:h-14 lg:text-[1.05rem]"
               >
-                Menu
+                See the sets
               </Link>
             </div>
           </div>
@@ -74,22 +74,24 @@ export default function HomePage() {
               Book
             </Link>
             <Link
-              href="/menu"
+              href="/sets"
               className="press flex h-12 flex-1 items-center justify-center rounded-full border-[1.5px] border-ink"
             >
-              Menu
+              See the sets
             </Link>
           </div>
         </section>
 
-        <div className="mt-8 space-y-10 md:mt-12 md:space-y-8 lg:mt-14">
+        <TierCards />
+
+        <div className="mt-10 space-y-10 md:mt-14 md:space-y-8">
           <HoursCard />
 
           <div className="space-y-10 md:grid md:grid-cols-2 md:items-stretch md:gap-6 md:space-y-0 lg:gap-8">
             <section>
               <div className="text-center md:text-left">
                 <h2 className="font-heading text-[2.6rem] leading-none lg:text-[3.1rem]">Price List</h2>
-                <span className="pill mt-3">From £15 / hour</span>
+                <span className="pill mt-3">From £15 an hour</span>
               </div>
               <ul className="surface mt-5 divide-y divide-ink/8 overflow-hidden rounded-3xl">
                 {featured.map((item) => (
@@ -113,7 +115,7 @@ export default function HomePage() {
               <h2 className="font-heading text-[2.6rem] leading-none lg:text-[3.1rem]">Policy</h2>
               <span className="pill mt-3">Read before booking</span>
               <p className="mt-4 text-sm leading-6 tracking-wide lg:text-[15px] lg:leading-7">
-                £15 deposit to hold your slot. Balance in cash on the day. Home-based, two cats, street parking.
+                Deposit is £15 an hour for the slot you pick. Balance in cash on the day. Home-based, two cats, street parking.
               </p>
               <Link href="/policy" className="mt-4 inline-block text-sm underline underline-offset-4">
                 Full policy
@@ -121,26 +123,6 @@ export default function HomePage() {
             </section>
           </div>
         </div>
-
-        <section className="pt-10 md:pt-14">
-          <div className="flex items-end justify-between">
-            <h2 className="font-heading text-[2.4rem] leading-none lg:text-[3rem]">Sets</h2>
-            <Link href="/gallery" className="text-sm underline decoration-ink/30 underline-offset-4">
-              All
-            </Link>
-          </div>
-          <div className="mt-4 flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-5 md:gap-4 md:overflow-visible">
-            {studio.gallery.map((shot) => (
-              <Link
-                key={shot.src}
-                href="/gallery"
-                className="press relative h-40 w-32 shrink-0 snap-start overflow-hidden rounded-2xl md:aspect-[4/5] md:h-auto md:w-auto md:rounded-3xl"
-              >
-                <Image src={shot.src} alt={shot.alt} fill className="object-cover" />
-              </Link>
-            ))}
-          </div>
-        </section>
 
         <HomeReviews />
         <SocialLinks className="pb-4 md:hidden" />

@@ -1,45 +1,55 @@
-import { consultLengths, consultRate } from "./hours";
+import { consultByHours, consultLengths, consultRate, durationLabel, tierTitle } from "./hours";
+
+export type BookStep = "tier" | "when" | "details";
 
 export type BookState = {
-  hours: number;
+  hours?: number;
   date?: string;
   time?: string;
   month?: string;
-  step: "duration" | "when" | "details";
+  step: BookStep;
 };
 
 export function bookFromParams(params: URLSearchParams): BookState {
-  const hours = Number(params.get("h") || 0);
-  const valid = consultLengths.some((item) => item.hours === hours);
+  const parsed = Number(params.get("h"));
+  const hours = consultByHours(parsed)?.hours;
   const date = params.get("day") || undefined;
+  const time = params.get("tm") || undefined;
+  const requested = params.get("s");
+  let step: BookStep = "tier";
+  if (!hours || requested === "tier") step = "tier";
+  else if (requested === "details" && date && time) step = "details";
+  else step = "when";
   return {
-    hours: valid ? hours : 0,
+    hours,
     date,
-    time: params.get("tm") || undefined,
+    time,
     month: params.get("m") || (date ? date.slice(0, 7) : undefined),
-    step: (params.get("s") as BookState["step"]) || "duration",
+    step,
   };
 }
 
-export function bookHref(state: Partial<BookState> & { hours?: number }) {
+export function bookHref(state: Partial<BookState>) {
   const p = new URLSearchParams();
+  const tier = state.hours != null ? consultByHours(state.hours) : undefined;
   if (state.step) p.set("s", state.step);
-  if (state.hours) p.set("h", String(state.hours));
+  if (tier) p.set("h", String(tier.hours));
   if (state.date) p.set("day", state.date);
   if (state.time) p.set("tm", state.time);
   if (state.month) p.set("m", state.month);
-  return `/book?${p.toString()}`;
+  const query = p.toString();
+  return query ? `/book?${query}` : "/book";
 }
 
 export function consultQuote(hours: number) {
-  const mins = hours * 60;
-  const length = consultLengths.find((item) => item.hours === hours);
-  const label = length?.label ?? (hours === 1 ? "1 hour" : `${hours} hours`);
+  const mins = Math.round(hours * 60);
+  const tier = consultLengths.find((item) => item.hours === hours);
+  const label = tier ? tierTitle(tier.hours) : `Consultation · ${durationLabel(hours)}`;
   return {
-    lines: [{ label: `Consultation · ${label}`, amount: hours * consultRate, minutes: mins }],
+    lines: [{ label, amount: hours * consultRate, minutes: mins }],
     total: hours * consultRate,
     minutes: mins,
     warnings: [] as string[],
-    summary: `Consultation · ${label}`,
+    summary: label,
   };
 }

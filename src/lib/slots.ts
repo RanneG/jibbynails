@@ -1,3 +1,4 @@
+import { chairBufferMinutes } from "./hours";
 import { studio } from "./studio";
 
 export type DaySlots = {
@@ -79,6 +80,16 @@ export function timeToMinutes(hhmm: string) {
   return hour * 60 + minute;
 }
 
+/** True once it is 12:00 noon London time on the day before `date`, or later. */
+export function pastBookingCutoff(date: string) {
+  const cutoffDay = addDays(date, -1);
+  const today = todayKey();
+  if (today > cutoffDay) return true;
+  if (today < cutoffDay) return false;
+  const now = londonParts(new Date());
+  return now.hour * 60 + now.minute >= 12 * 60;
+}
+
 export function rangesOverlap(
   aStart: number,
   aEnd: number,
@@ -88,14 +99,16 @@ export function rangesOverlap(
   return aStart < bEnd && bStart < aEnd;
 }
 
+/** `occupied[].hours` is the full block already reserved, including that booking's buffer. */
 export function slotConflicts(
   date: string,
   time: string,
   hours: number,
-  occupied: OccupiedSlot[]
+  occupied: OccupiedSlot[],
+  bufferMinutes = chairBufferMinutes
 ) {
   const start = timeToMinutes(time);
-  const end = start + hours * 60;
+  const end = start + hours * 60 + bufferMinutes;
   return occupied.some((item) => {
     if (item.date !== date) return false;
     const otherStart = timeToMinutes(item.time);
@@ -110,7 +123,7 @@ function timesForDate(date: string, minutes: number, occupied: OccupiedSlot[]) {
 
   const now = londonParts(new Date());
   const today = todayKey();
-  if (date < today) return [];
+  if (date < today || pastBookingCutoff(date)) return [];
   const hours = duration / 60;
   const lastStart = studio.closeHour * 60 - duration;
   const times: string[] = [];

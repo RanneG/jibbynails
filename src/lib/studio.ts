@@ -21,26 +21,40 @@ export const studio = {
     { day: "Friday", hours: "Closed" },
     { day: "Saturday", hours: "Closed" },
   ],
+  /**
+   * Every photo is filed under the tier it would book as (`hours` matches
+   * `consultLengths`). Move a photo by changing its `hours`.
+   */
   gallery: [
     {
       src: "/brand/gallery-1.jpg",
-      alt: "Nude almond nails with candy-stripe French tips and tiny charms",
-    },
-    {
-      src: "/brand/gallery-2.jpg",
-      alt: "Playful mixed character set with charms and colour",
-    },
-    {
-      src: "/brand/gallery-3.jpg",
-      alt: "Yellow and berry fruit-inspired set with 3D texture",
+      alt: "Short round nails with red candy-stripe French tips and tiny 3D flowers",
+      caption: "Short round · candy-stripe French · tiny 3D flowers",
+      hours: 1.5,
     },
     {
       src: "/brand/gallery-4.jpg",
-      alt: "Detailed Jibbynails set",
+      alt: "Square white French nails with silver butterflies, crosses and pearls",
+      caption: "Square · white French · silver charms and pearls",
+      hours: 2,
     },
     {
       src: "/brand/gallery-5.jpg",
-      alt: "Detailed Jibbynails set",
+      alt: "Almond nails with a painted character, blue 3D bows and cherries",
+      caption: "Almond · painted character · blue 3D bows",
+      hours: 2,
+    },
+    {
+      src: "/brand/gallery-2.jpg",
+      alt: "Long almond dessert set with 3D bows, whipped cream, cherries and chocolate texture",
+      caption: "Long almond · 3D bows, cream and chocolate texture",
+      hours: 3,
+    },
+    {
+      src: "/brand/gallery-3.jpg",
+      alt: "Airbrushed fruit set with painted citrus slices and 3D croissant texture",
+      caption: "Almond · airbrushed fruit · hand-painted slices · 3D texture",
+      hours: 3,
     },
   ],
 } as const;

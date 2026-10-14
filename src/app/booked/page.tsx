@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { BookingNotice } from "@/components/booking-notice";
 import { consultQuote } from "@/lib/booking-url";
 import { formatClockTime, prettyDay } from "@/lib/hours";
 import { emptyDraft } from "@/lib/types";
@@ -34,6 +35,7 @@ export default async function BookedPage({
   }
 
   const quote = consultQuote(stored.hours);
+  const cancelled = stored.status === "cancelled";
   const draft = emptyDraft();
   draft.name = stored.name;
   draft.phone = stored.phone;
@@ -45,7 +47,7 @@ export default async function BookedPage({
   return (
     <div className="flex min-h-0 flex-1 flex-col md:mx-auto md:w-full md:max-w-lg">
       <div className="px-5 pt-8">
-        <p className="pill">Booked</p>
+        <p className="pill">{cancelled ? "Cancelled" : "Booked"}</p>
         <h1 className="font-heading mt-4 text-[2.8rem] leading-none">
           {prettyDay(stored.date)}
           <br />
@@ -62,18 +64,34 @@ export default async function BookedPage({
         <div className="surface rounded-3xl p-5">
           {quote.lines.map((line) => (
             <div key={line.label} className="flex justify-between gap-3 py-1 text-sm">
-              <span className="text-muted-foreground">{line.label} deposit</span>
-              <span>{formatMoney(line.amount)}</span>
+              <span className="min-w-0 text-muted-foreground">{line.label} deposit</span>
+              <span className="shrink-0">{formatMoney(line.amount)}</span>
             </div>
           ))}
           {draft.inspo ? <p className="mt-3 text-sm text-muted-foreground">{draft.inspo}</p> : null}
+          {stored.nailPhotoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={stored.nailPhotoUrl} alt="Nails sent with this booking" className="mt-3 max-h-56 w-full rounded-2xl object-cover" />
+          ) : null}
+          {cancelled || stored.updateNote || stored.extraBufferMinutes ? (
+            <div className="mt-3">
+              <BookingNotice
+                cancelled={cancelled}
+                extraMinutes={cancelled ? 0 : stored.extraBufferMinutes}
+                hours={stored.hours}
+                note={stored.updateNote}
+              />
+            </div>
+          ) : null}
           <div className="mt-3 flex justify-between border-t border-ink/8 pt-3 font-medium">
             <span>{formatDuration(quote.minutes)}</span>
             <span>{formatMoney(quote.total)}</span>
           </div>
         </div>
         <p className="mt-4 text-sm tracking-wide text-muted-foreground">
-          Balance in cash on the day. This slot is held — nobody else can take it.
+          {cancelled
+            ? "This slot is free again."
+            : "Balance in cash on the day. This slot is held — nobody else can take it."}
         </p>
         <SaveVisit id={stored.id} draft={draft} quote={quote} />
         <Link href="/account" className="btn-gold mt-5">

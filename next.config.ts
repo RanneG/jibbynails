@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   allowedDevOrigins: ["127.0.0.1"],
+  async redirects() {
+    return [{ source: "/gallery", destination: "/sets", permanent: true }];
+  },
 };
 
 export default nextConfig;

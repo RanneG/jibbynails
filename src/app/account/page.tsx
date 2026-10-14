@@ -5,6 +5,7 @@ import { bookingsForUser } from "@/lib/server-store";
 import { currentUser } from "@/lib/session";
 import { formatClockTime, prettyDay } from "@/lib/hours";
 import { consultQuote } from "@/lib/booking-url";
+import { BookingNotice } from "@/components/booking-notice";
 import { formatMoney } from "@/lib/pricing";
 import { todayKey } from "@/lib/slots";
 
@@ -94,12 +95,26 @@ export default async function AccountPage({
                 const quote = consultQuote(item.hours);
                 return (
                   <li key={item.id}>
-                    <Link className="press surface flex items-center justify-between gap-3 rounded-3xl px-4 py-3.5" href={`/booked?id=${item.id}`}>
-                      <span>
-                        <span className="block text-sm">{prettyDay(item.date)} · {formatClockTime(item.time)}</span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">Consultation · {item.hours} hours</span>
+                    <Link className="press surface block rounded-3xl px-4 py-3.5" href={`/booked?id=${item.id}`}>
+                      <span className="flex items-center justify-between gap-3">
+                        <span>
+                          <span className="block text-sm">{prettyDay(item.date)} · {formatClockTime(item.time)}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {item.status === "cancelled" ? "Cancelled" : quote.summary}
+                          </span>
+                        </span>
+                        <span className="text-sm">{formatMoney(quote.total)}</span>
                       </span>
-                      <span className="text-sm">{formatMoney(quote.total)}</span>
+                      {item.status === "cancelled" || item.updateNote || item.extraBufferMinutes ? (
+                        <div className="mt-3">
+                          <BookingNotice
+                            cancelled={item.status === "cancelled"}
+                            extraMinutes={item.status === "cancelled" ? 0 : item.extraBufferMinutes}
+                            hours={item.hours}
+                            note={item.updateNote}
+                          />
+                        </div>
+                      ) : null}
                     </Link>
                   </li>
                 );
@@ -116,6 +131,8 @@ export default async function AccountPage({
               {past.map((item) => (
                 <li key={item.id} className="text-sm text-muted-foreground">
                   {prettyDay(item.date)} · {formatClockTime(item.time)}
+                  {item.status === "cancelled" ? " · Cancelled" : ""}
+                  {item.updateNote ? ` · ${item.updateNote}` : ""}
                 </li>
               ))}
             </ul>

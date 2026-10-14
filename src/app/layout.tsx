@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description:
-    "Book Jibbynails in Strood. £15 deposit an hour, her real menu, and reviews on the site.",
+    "Book a consultation at Jibbynails in Strood. Four slots, from 1 hour to 3 hours, deposit £15 an hour.",
   icons: {
     icon: "/brand/logo.png",
     apple: "/brand/logo.png",

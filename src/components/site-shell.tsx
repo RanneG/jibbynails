@@ -11,7 +11,7 @@ export function SiteShell({
   className?: string;
 }) {
   return (
-    <div className={cn("flex min-h-dvh flex-col overflow-x-hidden bg-background", className)}>
+    <div className={cn("flex min-h-dvh flex-col overflow-x-clip bg-background", className)}>
       <SiteHeader />
       <div className="mx-auto flex min-h-0 w-full max-w-[1200px] flex-1 flex-col">{children}</div>
       <footer className="mt-auto hidden border-t border-ink/10 md:block">

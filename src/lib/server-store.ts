@@ -1,9 +1,13 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { chairBufferMinutes } from "./hours";
+import { slotConflicts, type OccupiedSlot } from "./slots";
 
 const FILE = path.join(process.cwd(), "data", "store.json");
 const SECRET = process.env.SESSION_SECRET || "jibby-local-dev-secret";
+
+export type BookingStatus = "confirmed" | "updated" | "cancelled";
 
 export type StudioBooking = {
   id: string;
@@ -16,6 +20,11 @@ export type StudioBooking = {
   phone: string;
   email: string;
   inspo: string;
+  nailPhotoUrl?: string;
+  status?: BookingStatus;
+  updateNote?: string;
+  extraBufferMinutes?: number;
+  updatedAt?: string;
 };
 
 export type AccountUser = {
@@ -35,13 +44,25 @@ export type Session = {
   expiresAt: number;
 };
 
+export type StoredReview = {
+  id: string;
+  createdAt: string;
+  name: string;
+  rating: number;
+  text: string;
+  photoUrl?: string;
+  visitId?: string;
+  visibility: "public" | "private";
+};
+
 type Store = {
   users: AccountUser[];
   sessions: Session[];
   bookings: StudioBooking[];
+  reviews: StoredReview[];
 };
 
-const empty: Store = { users: [], sessions: [], bookings: [] };
+const empty: Store = { users: [], sessions: [], bookings: [], reviews: [] };
 
 let queue: Promise<unknown> = Promise.resolve();
 
@@ -62,9 +83,10 @@ async function readStore(): Promise<Store> {
       users: parsed.users ?? [],
       sessions: parsed.sessions ?? [],
       bookings: parsed.bookings ?? [],
+      reviews: parsed.reviews ?? [],
     };
   } catch {
-    return { ...empty, users: [], sessions: [], bookings: [] };
+    return { ...empty };
   }
 }
 
@@ -100,18 +122,30 @@ export async function findBooking(id: string) {
   return bookings.find((item) => item.id === id);
 }
 
-export async function createBooking(input: Omit<StudioBooking, "id" | "createdAt">) {
+/** Full chair block in hours: the visit plus the gap she uses to message the client. */
+export function blockedHours(booking: Pick<StudioBooking, "hours" | "extraBufferMinutes" | "status">) {
+  if (booking.status === "cancelled") return 0;
+  return booking.hours + (chairBufferMinutes + (booking.extraBufferMinutes ?? 0)) / 60;
+}
+
+export function toOccupied(bookings: StudioBooking[], exceptId?: string): OccupiedSlot[] {
+  return bookings
+    .filter((item) => item.id !== exceptId && item.status !== "cancelled")
+    .map((item) => ({ date: item.date, time: item.time, hours: blockedHours(item) }));
+}
+
+export async function createBooking(
+  input: Omit<StudioBooking, "id" | "createdAt" | "status" | "updatedAt" | "extraBufferMinutes" | "updateNote">
+) {
   return run(async () => {
     const store = await readStore();
-    const clash = store.bookings.some((item) => {
-      if (item.date !== input.date) return false;
-      const a = timeToMin(input.time);
-      const b = timeToMin(item.time);
-      return a < b + item.hours * 60 && b < a + input.hours * 60;
-    });
-    if (clash) return { ok: false as const, reason: "taken" };
+    if (slotConflicts(input.date, input.time, input.hours, toOccupied(store.bookings))) {
+      return { ok: false as const, reason: "taken" };
+    }
     const booking: StudioBooking = {
       ...input,
+      status: "confirmed",
+      extraBufferMinutes: 0,
       id: newId("visit"),
       createdAt: new Date().toISOString(),
     };
@@ -121,9 +155,62 @@ export async function createBooking(input: Omit<StudioBooking, "id" | "createdAt
   });
 }
 
-function timeToMin(hhmm: string) {
-  const [h, m] = hhmm.split(":").map(Number);
-  return h * 60 + m;
+export async function updateBooking(
+  id: string,
+  input: { note: string; extraBufferMinutes: number }
+) {
+  return run(async () => {
+    const store = await readStore();
+    const current = store.bookings.find((item) => item.id === id);
+    if (!current || current.status === "cancelled") return { ok: false as const, reason: "missing" };
+    const extra = input.extraBufferMinutes;
+    if (
+      slotConflicts(
+        current.date,
+        current.time,
+        current.hours,
+        toOccupied(store.bookings, id),
+        chairBufferMinutes + extra
+      )
+    ) {
+      return { ok: false as const, reason: "overlap" };
+    }
+    const note = input.note.trim();
+    store.bookings = store.bookings.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            updateNote: note || undefined,
+            extraBufferMinutes: extra,
+            status: note || extra > 0 ? "updated" : "confirmed",
+            updatedAt: new Date().toISOString(),
+          }
+        : item
+    );
+    await writeStore(store);
+    return { ok: true as const };
+  });
+}
+
+export async function cancelBooking(id: string, note: string) {
+  return run(async () => {
+    const store = await readStore();
+    const current = store.bookings.find((item) => item.id === id);
+    if (!current || current.status === "cancelled") return { ok: false as const, reason: "missing" };
+    const message = note.trim() || "Jibby cancelled this booking. Message her if you need another time.";
+    store.bookings = store.bookings.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            status: "cancelled" as const,
+            updateNote: message,
+            updatedAt: new Date().toISOString(),
+          }
+        : item
+    );
+    await writeStore(store);
+    return { ok: true as const };
+  });
 }
 
 export async function findUserByEmail(email: string) {
@@ -217,4 +304,43 @@ export async function bookingsForUser(userId: string, email: string) {
   return bookings
     .filter((item) => item.userId === userId || item.email.toLowerCase() === email.toLowerCase())
     .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+}
+
+export async function listPublicReviews() {
+  const store = await readStore();
+  return store.reviews
+    .filter((item) => item.visibility === "public")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function listPrivateFeedback() {
+  const store = await readStore();
+  return store.reviews
+    .filter((item) => item.visibility === "private")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function createReview(input: {
+  name: string;
+  rating: number;
+  text: string;
+  photoUrl?: string;
+  visitId?: string;
+}) {
+  return run(async () => {
+    const store = await readStore();
+    const review: StoredReview = {
+      id: newId("rev"),
+      createdAt: new Date().toISOString(),
+      name: input.name,
+      rating: input.rating,
+      text: input.text,
+      photoUrl: input.photoUrl,
+      visitId: input.visitId,
+      visibility: input.rating >= 5 ? "public" : "private",
+    };
+    store.reviews.push(review);
+    await writeStore(store);
+    return review;
+  });
 }

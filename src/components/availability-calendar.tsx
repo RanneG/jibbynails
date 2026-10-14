@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { bookHref, type BookState } from "@/lib/booking-url";
@@ -10,6 +10,7 @@ import {
   monthLabel,
   monthMatrix,
   nextAvailable,
+  pastBookingCutoff,
   shiftMonth,
   todayKey,
   type OccupiedSlot,
@@ -30,11 +31,12 @@ export function AvailabilityCalendar({
 }) {
   const todayMonth = todayKey().slice(0, 7);
   const maxMonth = shiftMonth(todayMonth, MAX_MONTHS_AHEAD);
-  const [view, setView] = useState(() => book.date?.slice(0, 7) || todayMonth);
-
-  useEffect(() => {
-    if (book.date) setView(book.date.slice(0, 7));
-  }, [book.date]);
+  // Month the user paged to. Reset whenever the picked date changes so the
+  // calendar follows the selection without an effect.
+  const [paged, setPaged] = useState<{ forDate?: string; month: string } | null>(null);
+  const view =
+    paged && paged.forDate === book.date ? paged.month : book.date?.slice(0, 7) || todayMonth;
+  const setView = (month: string) => setPaged({ forDate: book.date, month });
 
   const minutes = (book.hours || 1) * 60;
   const [year, monthNum] = view.split("-").map(Number);
@@ -93,7 +95,9 @@ export function AvailabilityCalendar({
         </Link>
       ) : null}
 
-      <div className="surface mt-4 rounded-3xl px-3 py-4">
+      <p className="mt-4 text-sm tracking-wide text-muted-foreground">Book before 12pm the day before.</p>
+
+      <div className="surface mt-3 rounded-3xl px-3 py-4">
         <div className="grid grid-cols-7 text-center text-[11px] tracking-[0.16em] text-muted-foreground">
           {WEEKDAYS.map((day, index) => (
             <span key={`${day}-${index}`}>{day}</span>
@@ -105,6 +109,7 @@ export function AvailabilityCalendar({
             const day = byDate.get(date);
             const past = date < todayKey();
             const closed = Boolean(day?.closed);
+            const cutoff = Boolean(day && !day.closed && pastBookingCutoff(date));
             const full = Boolean(day && !day.closed && day.times.length === 0);
             const open = Boolean(day && day.times.length > 0);
             const selectedDay = book.date === date;
@@ -129,7 +134,11 @@ export function AvailabilityCalendar({
                 href={bookHref({ ...book, date, time: undefined, step: "when" })}
                 className={className}
                 aria-label={
-                  closed ? `${prettyDay(date)}, closed` : full ? `${prettyDay(date)}, full` : prettyDay(date)
+                  closed || cutoff
+                    ? `${prettyDay(date)}, closed`
+                    : full
+                      ? `${prettyDay(date)}, full`
+                      : prettyDay(date)
                 }
               >
                 {num}
@@ -144,7 +153,11 @@ export function AvailabilityCalendar({
           <p className="text-sm">{prettyDay(selected.date)}</p>
           {selected.closed || selected.times.length === 0 ? (
             <div className="mt-2">
-              <p className="text-sm text-muted-foreground">Sorry, nothing today.</p>
+              <p className="text-sm text-muted-foreground">
+                {!selected.closed && pastBookingCutoff(selected.date)
+                  ? "This day is closed for new bookings."
+                  : "Sorry, nothing today."}
+              </p>
               {upcoming ? (
                 <Link
                   href={bookHref({ ...book, date: upcoming.date, time: undefined, step: "when" })}
